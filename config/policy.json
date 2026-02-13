@@ -1,0 +1,32 @@
+{
+  "allowed_roots": ["/project"],
+  "blocked_path_patterns": [
+    "\\.env$",
+    "id_rsa",
+    "credentials",
+    "secret",
+    "/etc/",
+    "/proc/",
+    "/sys/"
+  ],
+  "blocked_content_patterns": [
+    "eval\\(",
+    "exec\\(",
+    "os\\.system",
+    "subprocess\\.",
+    "powershell",
+    "curl\\s+.*\\|\\s*(bash|sh)",
+    "wget\\s+.*\\|\\s*(bash|sh)"
+  ],
+  "allow_network": false,
+  "allowed_domains": [],
+  "max_bytes_read": 262144,
+  "max_bytes_write": 262144,
+  "max_http_bytes": 262144,
+  "allow_shell": false,
+  "redact_patterns": [
+    "sk-[A-Za-z0-9]{20,}",
+    "AKIA[0-9A-Z]{16}",
+    "(?i)api[_-]?key\\s*[:=]\\s*['\"]?[A-Za-z0-9_-]{16,}"
+  ]
+}

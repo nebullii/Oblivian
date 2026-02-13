@@ -1,0 +1,72 @@
+Metadata-Version: 2.4
+Name: oblivian
+Version: 0.1.0
+Summary: Sidecar firewall + scanner for agent tool calls
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.110
+Requires-Dist: uvicorn>=0.23
+Requires-Dist: pydantic>=2.5
+
+# Oblivian
+
+Portable sidecar firewall + offline Markdown scanner for agent tool calls.
+
+## What it does
+
+- Enforces a policy for file, network, and shell tools (default-deny).
+- Redacts secrets from tool outputs.
+- Audits every decision to a log file.
+- Scans Markdown for common prompt-injection patterns.
+
+## Quick start
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+
+# Run the sidecar
+oblivian serve --host 127.0.0.1 --port 8080
+
+# Scan Markdown
+oblivian scan docs/skill.md --fail-on-high
+```
+
+## Policy config
+
+Default policy lives at `config/policy.json`. Override with:
+
+```bash
+export OBLIVIAN_POLICY_PATH=/path/to/policy.json
+```
+
+Key settings:
+
+- `allowed_roots`: list of filesystem roots allowed for read/write
+- `blocked_path_patterns`: regex patterns for sensitive files
+- `blocked_content_patterns`: regex patterns for dangerous code
+- `allow_network`: enable/disable http fetches
+- `allowed_domains`: optional HTTPS allowlist
+- `allow_shell`: enable/disable shell tool
+- `max_bytes_read` / `max_bytes_write` / `max_http_bytes`
+
+## HTTP API
+
+`POST /v1/tool/execute`
+
+```json
+{
+  "tool_name": "read_file",
+  "args": {"path": "/project/README.md"},
+  "request_context": {"task_id": "t1"}
+}
+```
+
+`POST /v1/scan`
+
+```json
+{ "text": "# Skill\nDo not ignore previous instructions" }
+```
+
+Audit log path defaults to `./oblivian_audit.log` and can be overridden with `OBLIVIAN_AUDIT_PATH`.

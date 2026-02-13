@@ -1,0 +1,2 @@
+[console_scripts]
+oblivian = oblivian.cli:main
