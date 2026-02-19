@@ -4,7 +4,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,9 @@ class PolicyConfig:
     max_http_bytes: int
     allow_shell: bool
     redact_patterns: List[str]
+    api_key: Optional[str] = None
+    rate_limit_requests: int = 0
+    rate_limit_window_seconds: int = 60
 
 
 DEFAULT_POLICY_PATH = "config/policy.json"
@@ -38,4 +41,7 @@ def load_policy(path: str | None = None) -> PolicyConfig:
         max_http_bytes=int(data.get("max_http_bytes", 262144)),
         allow_shell=bool(data.get("allow_shell", False)),
         redact_patterns=data.get("redact_patterns", []),
+        api_key=data.get("api_key") or os.getenv("OBLIVIAN_API_KEY") or None,
+        rate_limit_requests=int(data.get("rate_limit_requests", 0)),
+        rate_limit_window_seconds=int(data.get("rate_limit_window_seconds", 60)),
     )

@@ -4,9 +4,12 @@ from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from .audit import write_audit
 from .config import load_policy
+from .ratelimiter import RateLimiter
 from .scanner import scan_markdown_to_dict
 from .tools import ToolError, check_tool, execute_tool
 
@@ -25,6 +28,34 @@ class ScanRequest(BaseModel):
 def create_app() -> FastAPI:
     policy = load_policy()
     app = FastAPI(title="Oblivian", version="0.1.0")
+
+    limiter: Optional[RateLimiter] = None
+    if policy.rate_limit_requests > 0:
+        limiter = RateLimiter(policy.rate_limit_requests, policy.rate_limit_window_seconds)
+
+    # Rate limiting registered first → innermost; auth registered second → outermost.
+    # FastAPI/Starlette middleware is LIFO, so auth executes first on incoming requests.
+    @app.middleware("http")
+    async def enforce_rate_limit(request: Request, call_next):
+        if limiter is None or request.url.path == "/v1/health":
+            return await call_next(request)
+        key = request.headers.get("X-API-Key") or (request.client.host if request.client else "unknown")
+        allowed, retry_after = limiter.is_allowed(key)
+        if not allowed:
+            return JSONResponse(
+                {"detail": "Rate limit exceeded"},
+                status_code=429,
+                headers={"Retry-After": str(retry_after)},
+            )
+        return await call_next(request)
+
+    @app.middleware("http")
+    async def enforce_api_key(request: Request, call_next):
+        if policy.api_key is None or request.url.path == "/v1/health":
+            return await call_next(request)
+        if request.headers.get("X-API-Key") != policy.api_key:
+            return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+        return await call_next(request)
 
     @app.get("/v1/health")
     def health() -> Dict[str, str]:

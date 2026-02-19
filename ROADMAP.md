@@ -46,16 +46,16 @@
 ## Pipeline
 
 ### Auth & Transport Security
-- [ ] TLS/HTTPS support for the FastAPI server
-- [ ] API key authentication (header-based)
+- [x] TLS/HTTPS support for the FastAPI server (`--ssl-certfile` / `--ssl-keyfile` via uvicorn)
+- [x] API key authentication (`X-API-Key` header, configured via `api_key` in policy.json or `OBLIVIAN_API_KEY` env var)
 - [ ] JWT-based agent identity tokens
 - [ ] Request signing (HMAC or asymmetric)
 - [ ] Mutual TLS (mTLS) for agent-to-agent communication
 
 ### Rate Limiting
-- [ ] Per-agent request rate limiting
-- [ ] Configurable limits in `policy.json`
-- [ ] 429 responses with `Retry-After` header
+- [x] Per-agent request rate limiting
+- [x] Configurable limits in `policy.json`
+- [x] 429 responses with `Retry-After` header
 
 ### Policy Engine Enhancements
 - [ ] Dynamic policy reload without server restart

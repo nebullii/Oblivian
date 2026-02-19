@@ -29,6 +29,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         port=args.port,
         reload=args.reload,
         factory=True,
+        ssl_certfile=args.ssl_certfile or None,
+        ssl_keyfile=args.ssl_keyfile or None,
     )
     return 0
 
@@ -46,6 +48,8 @@ def main() -> None:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8080)
     serve.add_argument("--reload", action="store_true")
+    serve.add_argument("--ssl-certfile", default="", help="Path to TLS certificate file")
+    serve.add_argument("--ssl-keyfile", default="", help="Path to TLS private key file")
     serve.set_defaults(func=_cmd_serve)
 
     args = parser.parse_args()
