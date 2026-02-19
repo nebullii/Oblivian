@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from oblivian.config import PolicyConfig
-from oblivian.tools import ToolError, execute_tool
+from oblivian.tools import ToolError, check_tool, execute_tool
 
 
 def make_policy(root: Path) -> PolicyConfig:
@@ -49,3 +49,35 @@ def test_write_too_large_denied(tmp_path: Path):
     big = "x" * (policy.max_bytes_write + 1)
     with pytest.raises(ToolError):
         execute_tool(policy, "write_file", {"path": str(tmp_path / "big.txt"), "content": big})
+
+
+def test_unknown_tool_raises(tmp_path: Path):
+    policy = make_policy(tmp_path)
+    with pytest.raises(ToolError, match="Unknown tool blocked"):
+        execute_tool(policy, "launch_missiles", {})
+
+
+def test_shell_not_implemented(tmp_path: Path):
+    policy = make_policy(tmp_path)
+    # shell passes policy check (allow_shell=False → ToolError from check_tool)
+    # override to allow shell so we reach the "not implemented" branch
+    permissive = PolicyConfig(
+        allowed_roots=[str(tmp_path)],
+        blocked_path_patterns=[],
+        blocked_content_patterns=[],
+        allow_network=False,
+        allowed_domains=[],
+        max_bytes_read=1024,
+        max_bytes_write=1024,
+        max_http_bytes=1024,
+        allow_shell=True,
+        redact_patterns=[],
+    )
+    with pytest.raises(ToolError, match="not implemented"):
+        execute_tool(permissive, "shell", {"cmd": "ls"})
+
+
+def test_check_tool_http_network_disabled(tmp_path: Path):
+    policy = make_policy(tmp_path)
+    with pytest.raises(ToolError, match="Network access disabled"):
+        check_tool(policy, "http_fetch", {"url": "https://example.com"})
