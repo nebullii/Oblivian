@@ -45,3 +45,11 @@ def test_write_audit_creates_parent_dirs(tmp_path, monkeypatch):
     monkeypatch.setenv("OBLIVIAN_AUDIT_PATH", str(log))
     write_audit({"status": "allowed"})
     assert log.exists()
+
+
+def test_write_audit_rotates(tmp_path, monkeypatch):
+    log = tmp_path / "audit.log"
+    monkeypatch.setenv("OBLIVIAN_AUDIT_PATH", str(log))
+    write_audit({"status": "allowed", "msg": "a"}, max_bytes=1, max_files=3)
+    write_audit({"status": "denied", "msg": "b"}, max_bytes=1, max_files=3)
+    assert (tmp_path / "audit.log.1").exists()

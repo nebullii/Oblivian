@@ -17,6 +17,9 @@ PRIVATE_NETS = [
     ipaddress.ip_network("172.16.0.0/12"),
     ipaddress.ip_network("192.168.0.0/16"),
     ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fe80::/10"),
+    ipaddress.ip_network("fc00::/7"),
 ]
 
 
@@ -42,7 +45,20 @@ def _is_under_root(path: str, root: str) -> bool:
         return Path(path).resolve().is_relative_to(Path(root).resolve())
     except AttributeError:
         # Python <3.9 fallback
-        return str(Path(path).resolve()).startswith(str(Path(root).resolve()))
+        path_resolved = str(Path(path).resolve())
+        root_resolved = str(Path(root).resolve())
+        try:
+            return os.path.commonpath([path_resolved, root_resolved]) == root_resolved
+        except ValueError:
+            return False
+
+
+def is_private_ip(host: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return any(ip in net for net in PRIVATE_NETS)
 
 
 def check_read_path(policy: PolicyConfig, path: str) -> PolicyDecision:
@@ -67,12 +83,10 @@ def check_write_path(policy: PolicyConfig, path: str, content: str) -> PolicyDec
 
 
 def _is_private_host(host: str) -> bool:
-    try:
-        ip = ipaddress.ip_address(host)
-        return any(ip in net for net in PRIVATE_NETS)
-    except ValueError:
-        host = host.lower()
-        return host in {"localhost"} or host.endswith(".local")
+    if is_private_ip(host):
+        return True
+    host = host.lower()
+    return host in {"localhost"} or host.endswith(".local")
 
 
 def check_http(policy: PolicyConfig, url: str) -> PolicyDecision:

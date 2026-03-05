@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import json
-import os
 from pathlib import Path
+import socket
 from typing import Any, Dict
-from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .config import PolicyConfig
-from .policy import check_http, check_read_path, check_shell, check_write_path
+from .policy import check_http, check_read_path, check_shell, check_write_path, is_private_ip
 from .redaction import redact
 
 
@@ -66,17 +67,45 @@ def _write_limited(path: str, content: str, max_bytes: int) -> int:
     return len(data)
 
 
+class _NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise ToolError("Redirects are not allowed")
+
+
+def _ensure_public_host(host: str) -> None:
+    try:
+        infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except socket.gaierror as e:
+        raise ToolError(f"DNS resolution failed for host: {host}") from e
+    for _, _, _, _, sockaddr in infos:
+        ip = sockaddr[0]
+        if is_private_ip(ip):
+            raise ToolError(f"Blocked private/internal host: {host}")
+
+
 def _http_fetch(url: str, max_bytes: int) -> Dict[str, Any]:
+    parsed = urlparse(url)
+    if not parsed.hostname:
+        raise ToolError("URL missing hostname")
+    _ensure_public_host(parsed.hostname)
     req = Request(url, headers={"User-Agent": "Oblivian/0.1"})
-    with urlopen(req, timeout=15) as resp:
-        data = resp.read(max_bytes + 1)
-        if len(data) > max_bytes:
-            raise ToolError(f"Response exceeds max_http_bytes={max_bytes}")
-        return {
-            "status": resp.status,
-            "headers": dict(resp.headers),
-            "body": data.decode("utf-8", errors="replace"),
-        }
+    opener = build_opener(_NoRedirect)
+    try:
+        with opener.open(req, timeout=15) as resp:
+            data = resp.read(max_bytes + 1)
+            if len(data) > max_bytes:
+                raise ToolError(f"Response exceeds max_http_bytes={max_bytes}")
+            return {
+                "status": resp.status,
+                "headers": dict(resp.headers),
+                "body": data.decode("utf-8", errors="replace"),
+            }
+    except HTTPError as e:
+        if 300 <= e.code < 400:
+            raise ToolError("Redirects are not allowed") from e
+        raise ToolError(f"HTTP error: {e.code}") from e
+    except URLError as e:
+        raise ToolError(f"Network error: {e.reason}") from e
 
 
 def execute_tool(policy: PolicyConfig, tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:

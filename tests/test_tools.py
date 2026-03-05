@@ -1,4 +1,6 @@
 from pathlib import Path
+import socket
+from urllib.error import HTTPError
 
 import pytest
 
@@ -81,3 +83,53 @@ def test_check_tool_http_network_disabled(tmp_path: Path):
     policy = make_policy(tmp_path)
     with pytest.raises(ToolError, match="Network access disabled"):
         check_tool(policy, "http_fetch", {"url": "https://example.com"})
+
+
+def test_http_fetch_blocks_private_dns(tmp_path: Path, monkeypatch):
+    policy = PolicyConfig(
+        allowed_roots=[str(tmp_path)],
+        blocked_path_patterns=[],
+        blocked_content_patterns=[],
+        allow_network=True,
+        allowed_domains=[],
+        max_bytes_read=1024,
+        max_bytes_write=1024,
+        max_http_bytes=1024,
+        allow_shell=False,
+        redact_patterns=[],
+    )
+
+    def fake_getaddrinfo(host, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+    with pytest.raises(ToolError, match="Blocked private/internal host"):
+        execute_tool(policy, "http_fetch", {"url": "https://example.com"})
+
+
+def test_http_fetch_blocks_redirects(tmp_path: Path, monkeypatch):
+    policy = PolicyConfig(
+        allowed_roots=[str(tmp_path)],
+        blocked_path_patterns=[],
+        blocked_content_patterns=[],
+        allow_network=True,
+        allowed_domains=[],
+        max_bytes_read=1024,
+        max_bytes_write=1024,
+        max_http_bytes=1024,
+        allow_shell=False,
+        redact_patterns=[],
+    )
+
+    def fake_getaddrinfo(host, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+
+    class FakeOpener:
+        def open(self, req, timeout=15):
+            raise HTTPError(req.full_url, 302, "Found", hdrs={}, fp=None)
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr("oblivian.tools.build_opener", lambda *args, **kwargs: FakeOpener())
+
+    with pytest.raises(ToolError, match="Redirects are not allowed"):
+        execute_tool(policy, "http_fetch", {"url": "https://example.com"})
