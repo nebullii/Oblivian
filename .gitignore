@@ -8,3 +8,4 @@ oblivian_audit.log
 tmp/
 IMPLEMENTATION.md
 *.pem
+.env

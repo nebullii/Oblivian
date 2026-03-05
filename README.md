@@ -78,6 +78,10 @@ If `jwt_secret` is set, Oblivian accepts JWTs via:
 JWTs must include `sub` (or `agent_id`). Optional `jwt_issuer` and `jwt_audience` can be enforced.
 Use a long, random `jwt_secret` (32+ bytes recommended).
 
+## Environment
+
+Copy `.env.example` to `.env` and set values for local development. `.env` is ignored by git.
+
 Per-agent overrides are configured under `agent_policies` keyed by `sub`/`agent_id`.
 
 ## TLS

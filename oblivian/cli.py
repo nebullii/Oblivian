@@ -54,3 +54,7 @@ def main() -> None:
 
     args = parser.parse_args()
     sys.exit(args.func(args))
+
+
+if __name__ == "__main__":
+    main()
